@@ -2,7 +2,7 @@ package me.spencez.topic.recognition;
 
 import com.google.common.graph.MutableNetwork;
 import com.google.common.graph.NetworkBuilder;
-import me.spencez.topic.recognition.louvain.Edge;
+import me.spencez.topic.recognition.entity.Edge;
 import me.spencez.topic.recognition.louvain.Louvain;
 import org.apache.commons.io.FileUtils;
 

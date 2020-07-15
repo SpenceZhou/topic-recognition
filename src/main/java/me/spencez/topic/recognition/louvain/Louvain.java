@@ -3,6 +3,7 @@ package me.spencez.topic.recognition.louvain;
 import com.google.common.graph.MutableNetwork;
 import com.google.common.graph.Network;
 import com.google.common.graph.NetworkBuilder;
+import me.spencez.topic.recognition.entity.Edge;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,6 +33,19 @@ public class Louvain {
      */
     public Map<String, String> communityDetect(Network<String, Edge> network) {
 
+        // m 代表网络所有边的权重之和
+        Double m = 0.0;
+        Set<Edge> edges = network.edges();
+        for (Edge edge : edges) {
+            m += edge.weight;
+        }
+
+        Map<String, Double> KiMap = new HashMap<>();
+        for (String i : network.nodes()) {
+            KiMap.put(i, getKi(network, i));
+        }
+
+
         // 层次聚类算法 单层计算
         Double maxQ = 0.0;
 
@@ -53,15 +67,15 @@ public class Louvain {
                 }
             }
 
-            Double q = q(network, communityMap);
+            Double q = q(network, communityMap, m, KiMap);
             if (q <= maxQ) {
                 break;
             }
             maxQ = q;
 
-            System.out.println("layer " + layer + " network = " + newNetwork);
+//            System.out.println("layer " + layer + " network = " + newNetwork);
             System.out.println("layer " + layer + " q = " + q);
-            System.out.println("layer " + layer + " community = " + communityMap);
+//            System.out.println("layer " + layer + " community = " + communityMap);
 
             //压缩网络
             newNetwork = zipNetwork(newNetwork, layerCommunityMap);
@@ -79,6 +93,18 @@ public class Louvain {
      * @return
      */
     private Map<String, String> communityDetectLayer(Network<String, Edge> network) {
+
+        // m 代表网络所有边的权重之和
+        Double m = 0.0;
+        Set<Edge> edges = network.edges();
+        for (Edge edge : edges) {
+            m += edge.weight;
+        }
+
+        Map<String, Double> KiMap = new HashMap<>();
+        for (String i : network.nodes()) {
+            KiMap.put(i, getKi(network, i));
+        }
 
         // step1 将每个节点单独划分为一个社团
         Map<String, String> communityMap = new HashMap<>();
@@ -99,7 +125,8 @@ public class Louvain {
                     continue;
                 }
                 String deltaQCommunity = communityMap.get(j);
-                Double deltaQ = deltaQ(network, i, getCommunityNodes(j, communityMap));
+
+                Double deltaQ = deltaQ(network, i, getCommunityNodes(j, communityMap), m, KiMap);
                 if (deltaQ > maxDeltaQ) {
                     maxDeltaQ = deltaQ;
                     maxDeltaQCommunity = deltaQCommunity;
@@ -179,6 +206,46 @@ public class Louvain {
 
 
     /**
+     * 计算在目前社团划分情况下 整个图（网络）的模块度Q
+     *
+     * @param network
+     * @param communityMap 其中 key 表示 节点 value表示节点所属的社团
+     * @param m
+     * @param KiMap
+     * @return
+     */
+    public double q(Network<String, Edge> network, Map<String, String> communityMap, Double m, Map<String, Double> KiMap) {
+
+        Set<String> nodes = network.nodes();
+        Double sum = 0.0;
+        for (String i : nodes) {
+            for (String j : nodes) {
+                if (i.equals(j)) {
+                    continue;
+                }
+                String communityI = communityMap.get(i);
+                String communityJ = communityMap.get(j);
+                if (!communityI.equals(communityJ)) {
+                    continue;
+                }
+
+                // Aij  表示节点 i j 之间的权重
+                Edge edgeIJ = network.edgeConnectingOrNull(i, j);
+
+                if (edgeIJ != null && edgeIJ.weight > 0) {
+                    Double Aij = edgeIJ.weight;
+                    // Ki  表示代表 节点i所有相连边的权重之和
+                    Double Ki = KiMap.get(i);
+                    Double Kj = KiMap.get(j);
+                    sum += Aij - Ki * Kj / (2 * m);
+                }
+            }
+        }
+
+        return sum / (2 * m);
+    }
+
+    /**
      * 获取网络中 节点i 的相连边权重之和
      *
      * @param network
@@ -211,15 +278,12 @@ public class Louvain {
      * @param network
      * @param i
      * @param communityJSet 节点j所在社团的 节点集合
+     * @param m
+     * @param KiMap
      * @return
      */
-    public Double deltaQ(Network<String, Edge> network, String i, Set<String> communityJSet) {
 
-        Double m = 0.0;
-        Set<Edge> edges = network.edges();
-        for (Edge edge : edges) {
-            m += edge.weight;
-        }
+    public Double deltaQ(Network<String, Edge> network, String i, Set<String> communityJSet, Double m, Map<String, Double> KiMap) {
 
         Double Ki_in = 0.0;
         for (String j : communityJSet) {
@@ -229,17 +293,12 @@ public class Louvain {
             }
         }
 
+        Double Ki = KiMap.get(i);
+
         Double Sigma_tot = 0.0;
         for (String j : communityJSet) {
-            Set<Edge> set = network.incidentEdges(j);
-            if (set != null) {
-                for (Edge edge : set) {
-                    Sigma_tot += edge.weight;
-                }
-            }
+            Sigma_tot += KiMap.get(j);
         }
-
-        Double Ki = getKi(network, i);
 
         //deltaQ = (Ki_in/m) - Ki*Sigma_tot/(2*m*m)
         Double deltaQ = (Ki_in / m) - Ki * Sigma_tot / (2 * m * m);
@@ -263,15 +322,14 @@ public class Louvain {
         Map<String, Set<String>> communityNodesMap = new HashMap<>();
         for (String node : communityMap.keySet()) {
             String community = communityMap.get(node);
+            Set<String> set;
             if (communityNodesMap.containsKey(community)) {
-                Set<String> set = communityNodesMap.get(community);
-                set.add(node);
-                communityNodesMap.put(community, set);
+                set = communityNodesMap.get(community);
             } else {
-                Set<String> set = new HashSet<>();
-                set.add(node);
-                communityNodesMap.put(community, set);
+                set = new HashSet<>();
             }
+            set.add(node);
+            communityNodesMap.put(community, set);
         }
 
         MutableNetwork<String, Edge> zipNetwork = NetworkBuilder.undirected().allowsSelfLoops(true).build();
