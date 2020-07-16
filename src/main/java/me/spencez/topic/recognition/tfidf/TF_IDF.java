@@ -28,8 +28,8 @@ public class TF_IDF {
     private CloseableHttpClient httpclient = HttpClients.createDefault();
 
     public static void main(String[] args) {
-//        String text = "TF-IDF（term frequency–inverse document frequency）是一种用于信息检索与数据挖掘的常用加权技术。TF意思是词频(Term Frequency)，IDF意思是逆文本频率指数(Inverse Document Frequency)。";
-        String text = "When security vulnerabilities or misconfigurations are actively exploited by attackers, organizations need to react quickly in order to protect potentially vulnerable assets. 。";
+        String text = "TF-IDF是一种用于信息检索与数据挖掘的常用加权技术。TF意思是词频(Term Frequency)，IDF意思是逆文本频率指数(Inverse Document Frequency)。";
+//        String text = "When security vulnerabilities or misconfigurations are actively exploited by attackers, organizations need to react quickly in order to protect potentially vulnerable assets. 。";
         List<String> keywords = new TF_IDF().keywords(text, 10);
         for (String keyword : keywords) {
             System.out.println(keyword);
@@ -44,7 +44,7 @@ public class TF_IDF {
         // 2. 计算每个词的 tf-idf
         for (String key : segMap.keySet()) {
 
-            double tf_idf = getTFIDF(key, segMap.get(key));
+            double tf_idf = getTF_IDF(key, segMap.get(key));
             tf_idfMap.put(key, tf_idf);
         }
 
@@ -64,6 +64,10 @@ public class TF_IDF {
         Map<String, Integer> map = Maps.newHashMap();
         List<Term> words = HanLP.newSegment().seg(text);
         for (Term word : words) {
+            //标点符号
+            if (word.nature.startsWith("w")) {
+                continue;
+            }
             String key = word.word.toLowerCase().trim();
 
             if (map.keySet().contains(key)) {
@@ -82,7 +86,7 @@ public class TF_IDF {
 
     /**
      * 从网络中获取包含关键词的文档数量
-     *
+     *8
      * @param keyword
      * @return
      */
@@ -102,12 +106,6 @@ public class TF_IDF {
             result = result.replace(",", "");
             df = Long.parseLong(result);
 
-//            Matcher numberMatcher = Pattern.compile("\\d+(,\\d{3})*").matcher(result);
-//            if (numberMatcher.find()) {
-//                String number = numberMatcher.group();
-//                number = number.replace(",", "");
-//                df = Long.parseLong(number);
-//            }
         }
         return df;
     }
@@ -125,7 +123,7 @@ public class TF_IDF {
             }
             return String.valueOf(response.getStatusLine().getStatusCode());
         } catch (Exception e) {
-//            e.printStackTrace();
+            e.printStackTrace();
             return null;
         } finally {
             try {
@@ -134,15 +132,15 @@ public class TF_IDF {
                 e.printStackTrace();
             }
         }
-
     }
 
 
-    public double getTFIDF(String keyword, int tf) {
-        long documetNum = getFrequencyByNetwork(keyword);
-        double idf = Math.log(TOTAL / (documetNum + 1.0));
+    public double getTF_IDF(String keyword, int tf) {
+        long documentNum = getFrequencyByNetwork(keyword);
+        System.out.println("【"+keyword+"】df为："+documentNum);
+        double idf = Math.log(TOTAL / (documentNum + 1.0));
         double tfIdf = tf * idf;
-        System.out.println(keyword + "，的tf-idf值为：" + tfIdf);
+        System.out.println("【"+keyword + "】的tf-idf值为：" + tfIdf);
         return tfIdf;
     }
 
