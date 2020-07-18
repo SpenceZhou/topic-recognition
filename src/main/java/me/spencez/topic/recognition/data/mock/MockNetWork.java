@@ -72,7 +72,7 @@ public class MockNetWork {
         MockNetWork mockNetWork = new MockNetWork();
 
 
-        Network network = mockNetWork.mock(3000, 4);
+        Network network = mockNetWork.mock(1000, 15);
 
         Louvain louvain = new Louvain();
 
